@@ -1,0 +1,25 @@
+{
+  "$schema": "https://dl.viam.dev/module.schema.json",
+  "module_id": "stevebriskin:halloween-eyes",
+  "visibility": "private",
+  "url": "",
+  "description": "Logic to control halloween decoration with moving eyes",
+  "models": [
+    {
+      "api": "rdk:component:generic",
+      "model": "stevebriskin:halloween-eyes:eye-control",
+      "short_description": "Logic to control halloween decoration with moving eyes",
+      "markdown_link": "README.md#model-stevebriskinhalloween-eyeseyecontrol"
+    }
+  ],
+  "markdown_link": "README.md",
+  "entrypoint": "bin/halloween-eyes",
+  "build": {
+    "build": "make module.tar.gz",
+    "setup": "make setup",
+    "path": "module.tar.gz",
+    "arch": [
+      "linux/arm64"
+    ]
+  }
+}

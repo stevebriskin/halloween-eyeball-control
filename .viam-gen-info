@@ -1,0 +1,13 @@
+{
+  "module_name": "halloween-eyeball-control",
+  "namespace": "stevebriskin",
+  "language": "go",
+  "resource_type": "component",
+  "resource_subtype": "generic",
+  "model_name": "eyecontrol",
+  "enable_cloud_build": true,
+  "initialize_git": false,
+  "generator_version": "0.1.0",
+  "generated_on": "2025-10-03T20:54:32.277951Z",
+  "module_readme_link": "README.md"
+}
