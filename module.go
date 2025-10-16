@@ -64,6 +64,9 @@ type Config struct {
 func (cfg *Config) Validate(path string) ([]string, []string, error) {
 	var dependencies []string
 
+	logging.NewLogger("validate").Infof("Validating config: %+v", cfg)
+
+	// camera is required
 	if cfg.cameraName == "" {
 		return nil, nil, fmt.Errorf("camera_name is required")
 	}

@@ -2,7 +2,7 @@
   "$schema": "https://dl.viam.dev/module.schema.json",
   "module_id": "stevebriskin:halloween-eyes",
   "visibility": "private",
-  "url": "",
+  "url": "https://github.com/stevebriskin/halloween-eyeball-control",
   "description": "Logic to control halloween decoration with moving eyes",
   "models": [
     {
