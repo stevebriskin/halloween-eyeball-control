@@ -50,10 +50,10 @@ type HeadConfig struct {
 }
 
 type Config struct {
-	FieldOfView            float64      `json:"field_of_view"`
-	CameraName             string       `json:"camera_name"`
-	VisionServiceName      string       `json:"vision_service_name"`
-	Heads                  []HeadConfig `json:"heads"`
+	FieldOfView       float64      `json:"field_of_view"`
+	CameraName        string       `json:"camera_name"`
+	VisionServiceName string       `json:"vision_service_name"`
+	Heads             []HeadConfig `json:"heads"`
 }
 
 // Validate ensures all parts of the config are valid and important fields exist.
@@ -161,7 +161,7 @@ func newHead(headConfig HeadConfig, deps resource.Dependencies, logger logging.L
 	}
 
 	var servoEyeR servo.Servo
-		if headConfig.ServoEyeR != "" {
+	if headConfig.ServoEyeR != "" {
 		servoEyeR, err = resource.FromDependencies[servo.Servo](deps, servo.Named(headConfig.ServoEyeR))
 		if err != nil {
 			logger.Error(err)
@@ -180,7 +180,6 @@ func newHead(headConfig HeadConfig, deps resource.Dependencies, logger logging.L
 }
 
 func NewEyeControl(ctx context.Context, deps resource.Dependencies, name resource.Name, conf *Config, logger logging.Logger) (resource.Resource, error) {
-
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	camera, err := camera.FromDependencies(deps, conf.CameraName)
@@ -214,6 +213,9 @@ func NewEyeControl(ctx context.Context, deps resource.Dependencies, name resourc
 		cancelCtx:     cancelCtx,
 		cancelFunc:    cancelFunc,
 	}
+
+	go s.Run()
+
 	return s, nil
 }
 
@@ -222,7 +224,17 @@ func (s *halloweenEyeballControlEyecontrol) Name() resource.Name {
 }
 
 func (s *halloweenEyeballControlEyecontrol) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+	if cmd["start"] == true {
+		go s.Run()
+		return nil, nil
+	}
+
+	if cmd["stop"] == true {
+		s.cancelFunc()
+		return nil, nil
+	}
+
+	return nil, fmt.Errorf("Invalid command. Only start and stop are supported.")
 }
 
 func (s *halloweenEyeballControlEyecontrol) Close(context.Context) error {
@@ -232,6 +244,15 @@ func (s *halloweenEyeballControlEyecontrol) Close(context.Context) error {
 }
 
 func (s *halloweenEyeballControlEyecontrol) Run() error {
+	s.logger.Infof("Cleaning up prior run.")
+
+	s.cancelFunc()
+	<-s.cancelCtx.Done()
+
+	s.logger.Infof("Starting background control loop.")
+
+	s.cancelCtx, s.cancelFunc = context.WithCancel(context.Background())
+
 	imageWidth, _, err := getImageSize(s.cancelCtx, s.camera, s.logger)
 	if err != nil {
 		s.logger.Error(err)
@@ -291,7 +312,7 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 		}
 
 		targetAngle := head.computeTargetAngle(percentOfImageWidth, fieldOfView)
-		logger.Infof("%s: Percent of image width: %.1f, Target angle: %.1f degrees", head.name, percentOfImageWidth, targetAngle)
+		logger.Debugf("%s: Percent of image width: %.1f, Target angle: %.1f degrees", head.name, percentOfImageWidth, targetAngle)
 
 		if head.lightPin != nil {
 			head.lightPin.Set(context.Background(), true, nil)
