@@ -40,20 +40,20 @@ type Head struct {
 }
 
 type HeadConfig struct {
-	name                   string  `json:"name"`
-	locationWrtImageCenter float64 `json:"location_wrt_center"`
-	boardName              string  `json:"board_name"`
-	lightPin               string  `json:"light_pin"`
-	servoEyeL              string  `json:"servo_eye_l"`
-	servoEyeR              string  `json:"servo_eye_r"`
-	invertServoDirection   bool    `json:"invert_servo_direction"`
+	Name                   string  `json:"name"`
+	LocationWrtImageCenter float64 `json:"location_wrt_center"`
+	BoardName              string  `json:"board_name"`
+	LightPin               string  `json:"light_pin"`
+	ServoEyeL              string  `json:"servo_eye_l"`
+	ServoEyeR              string  `json:"servo_eye_r"`
+	InvertServoDirection   bool    `json:"invert_servo_direction"`
 }
 
 type Config struct {
-	fieldOfView            float64      `json:"field_of_view"`
-	cameraName             string       `json:"camera_name"`
-	visionServiceName      string       `json:"vision_service_name"`
-	heads                  []HeadConfig `json:"heads"`
+	FieldOfView            float64      `json:"field_of_view"`
+	CameraName             string       `json:"camera_name"`
+	VisionServiceName      string       `json:"vision_service_name"`
+	Heads                  []HeadConfig `json:"heads"`
 }
 
 // Validate ensures all parts of the config are valid and important fields exist.
@@ -66,46 +66,46 @@ func (cfg *Config) Validate(path string) ([]string, []string, error) {
 	logging.NewLogger("validate").Infof("Validating config: %+v", cfg)
 
 	// camera is required
-	if cfg.cameraName == "" {
+	if cfg.CameraName == "" {
 		return nil, nil, fmt.Errorf("camera_name is required")
 	}
-	if cfg.visionServiceName == "" {
+	if cfg.VisionServiceName == "" {
 		return nil, nil, fmt.Errorf("vision_service_name is required")
 	}
 
-	dependencies = append(dependencies, cfg.cameraName)
-	dependencies = append(dependencies, cfg.visionServiceName)
+	dependencies = append(dependencies, cfg.CameraName)
+	dependencies = append(dependencies, cfg.VisionServiceName)
 
-	for _, head := range cfg.heads {
-		if head.name == "" {
+	for _, head := range cfg.Heads {
+		if head.Name == "" {
 			return nil, nil, fmt.Errorf("head name is required")
 		}
-		if head.locationWrtImageCenter == 0 {
+		if head.LocationWrtImageCenter == 0 {
 			return nil, nil, fmt.Errorf("location_wrt_center is required")
 		}
 
-		if head.lightPin != "" {
-			if head.boardName == "" {
+		if head.LightPin != "" {
+			if head.BoardName == "" {
 				return nil, nil, fmt.Errorf("board_name is required when light_pin is provided")
 			}
 
-			dependencies = append(dependencies, head.boardName)
+			dependencies = append(dependencies, head.BoardName)
 		}
 
 		// left is required
-		if head.servoEyeL == "" {
+		if head.ServoEyeL == "" {
 			return nil, nil, fmt.Errorf("servo_eye_l is required")
 		}
-		dependencies = append(dependencies, head.servoEyeL)
+		dependencies = append(dependencies, head.ServoEyeL)
 
 		// right is optional
-		if head.servoEyeR != "" {
-			dependencies = append(dependencies, head.servoEyeR)
+		if head.ServoEyeR != "" {
+			dependencies = append(dependencies, head.ServoEyeR)
 		}
 
 	}
 
-	if len(cfg.heads) == 0 {
+	if len(cfg.Heads) == 0 {
 		return nil, nil, fmt.Errorf("at least one head is required")
 	}
 
@@ -139,14 +139,14 @@ func newHalloweenEyeballControlEyecontrol(ctx context.Context, deps resource.Dep
 
 func newHead(headConfig HeadConfig, deps resource.Dependencies, logger logging.Logger) (*Head, error) {
 	var lightPin board.GPIOPin
-	if headConfig.lightPin != "" {
-		b, err := board.FromDependencies(deps, headConfig.boardName)
+	if headConfig.LightPin != "" {
+		b, err := board.FromDependencies(deps, headConfig.BoardName)
 		if err != nil {
 			logger.Error(err)
 			return nil, err
 		}
 
-		lightPin, err = b.GPIOPinByName(headConfig.lightPin)
+		lightPin, err = b.GPIOPinByName(headConfig.LightPin)
 		if err != nil {
 			logger.Error(err)
 			return nil, err
@@ -154,15 +154,15 @@ func newHead(headConfig HeadConfig, deps resource.Dependencies, logger logging.L
 	}
 
 	// left is required
-	servoEyeL, err := resource.FromDependencies[servo.Servo](deps, servo.Named(headConfig.servoEyeL))
+	servoEyeL, err := resource.FromDependencies[servo.Servo](deps, servo.Named(headConfig.ServoEyeL))
 	if err != nil {
 		logger.Error(err)
 		return nil, err
 	}
 
 	var servoEyeR servo.Servo
-	if headConfig.servoEyeR != "" {
-		servoEyeR, err = resource.FromDependencies[servo.Servo](deps, servo.Named(headConfig.servoEyeR))
+		if headConfig.ServoEyeR != "" {
+		servoEyeR, err = resource.FromDependencies[servo.Servo](deps, servo.Named(headConfig.ServoEyeR))
 		if err != nil {
 			logger.Error(err)
 			return nil, err
@@ -170,12 +170,12 @@ func newHead(headConfig HeadConfig, deps resource.Dependencies, logger logging.L
 	}
 
 	return &Head{
-		name:                   headConfig.name,
-		locationWrtImageCenter: headConfig.locationWrtImageCenter,
+		name:                   headConfig.Name,
+		locationWrtImageCenter: headConfig.LocationWrtImageCenter,
 		lightPin:               lightPin,
 		servoEyeL:              servoEyeL,
 		servoEyeR:              servoEyeR,
-		invertServoDirection:   headConfig.invertServoDirection,
+		invertServoDirection:   headConfig.InvertServoDirection,
 	}, nil
 }
 
@@ -183,20 +183,20 @@ func NewEyeControl(ctx context.Context, deps resource.Dependencies, name resourc
 
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
-	camera, err := camera.FromDependencies(deps, conf.cameraName)
+	camera, err := camera.FromDependencies(deps, conf.CameraName)
 	if err != nil {
 		cancelFunc()
 		return nil, err
 	}
 
-	visionService, err := vision.FromDependencies(deps, conf.visionServiceName)
+	visionService, err := vision.FromDependencies(deps, conf.VisionServiceName)
 	if err != nil {
 		cancelFunc()
 		return nil, err
 	}
 
-	heads := make([]Head, len(conf.heads))
-	for i, headConf := range conf.heads {
+	heads := make([]Head, len(conf.Heads))
+	for i, headConf := range conf.Heads {
 		head, err := newHead(headConf, deps, logger)
 		if err != nil {
 			cancelFunc()
@@ -259,7 +259,7 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 			wg.Add(1)
 			go func(h Head) {
 				defer wg.Done()
-				err := h.process(s.cancelCtx, lowestPersonDetectionCenter, imageWidth, s.cfg.fieldOfView, s.logger)
+				err := h.process(s.cancelCtx, lowestPersonDetectionCenter, imageWidth, s.cfg.FieldOfView, s.logger)
 				if err != nil {
 					s.logger.Error(err)
 				}
