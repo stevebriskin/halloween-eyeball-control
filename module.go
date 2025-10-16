@@ -50,7 +50,6 @@ type HeadConfig struct {
 }
 
 type Config struct {
-	resource.AlwaysRebuild `json:"-"`
 	fieldOfView            float64      `json:"field_of_view"`
 	cameraName             string       `json:"camera_name"`
 	visionServiceName      string       `json:"vision_service_name"`
