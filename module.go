@@ -287,8 +287,7 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 			}(head)
 		}
 		wg.Wait()
-		time.Sleep(20 * time.Microsecond)
-
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 
@@ -395,13 +394,10 @@ func getLowestPersonDetections(ctx context.Context, vision1Service vision.Servic
 	var lowestPersonDetectionCenter int = -1
 	// Get the lowest # coordinate of a Person detection
 	for i, detection := range detections {
-		logger.Debugf("Detection %d:", i)
-		logger.Debugf("  Class Name: %s", detection.Label())
-		logger.Debugf("  Confidence: %.2f", detection.Score())
 		if detection.BoundingBox() != nil {
 			bbox := *detection.BoundingBox()
-			logger.Debugf("  Bounding Box: Min(%.2f, %.2f) Max(%.2f, %.2f)",
-				bbox.Min.X, bbox.Min.Y, bbox.Max.X, bbox.Max.Y)
+			logger.Debugf("Detection %d: Class Name: %s, Confidence: %.2f, Bounding Box: Min(%d, %d) Max(%d, %d)",
+				i, detection.Label(), detection.Score(), bbox.Min.X, bbox.Min.Y, bbox.Max.X, bbox.Max.Y)
 		}
 
 		if detection.Label() == "Person" {
