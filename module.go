@@ -367,7 +367,7 @@ func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64
 			}
 
 			// Only move if there's a significant difference
-			if math.Abs(angleDiff) > 1 {
+			if math.Abs(angleDiff) > 3.0 {
 				err = head.moveServosToAngle(ctx, moveAngle, logger)
 				if err != nil {
 					logger.Errorf("%s: Error moving servos in control loop: %v", head.name, err)
