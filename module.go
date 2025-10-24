@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"math"
+
 	"go.viam.com/rdk/components/board"
 	"go.viam.com/rdk/components/camera"
 	generic "go.viam.com/rdk/components/generic"
@@ -37,6 +39,10 @@ type Head struct {
 	servoEyeL              servo.Servo
 	servoEyeR              servo.Servo
 	invertServoDirection   bool
+
+	// mutable fields
+	mu          sync.Mutex
+	targetAngle float64
 }
 
 type HeadConfig struct {
@@ -50,10 +56,11 @@ type HeadConfig struct {
 }
 
 type Config struct {
-	FieldOfView       float64      `json:"field_of_view"`
-	CameraName        string       `json:"camera_name"`
-	VisionServiceName string       `json:"vision_service_name"`
-	Heads             []HeadConfig `json:"heads"`
+	FieldOfView           float64      `json:"field_of_view"`
+	MaxServoRatePerSecond float64      `json:"max_servo_rate_per_second"`
+	CameraName            string       `json:"camera_name"`
+	VisionServiceName     string       `json:"vision_service_name"`
+	Heads                 []HeadConfig `json:"heads"`
 }
 
 // Validate ensures all parts of the config are valid and important fields exist.
@@ -62,7 +69,6 @@ type Config struct {
 // resource being validated; e.g. "components.0".
 func (cfg *Config) Validate(path string) ([]string, []string, error) {
 	var dependencies []string
-
 	logging.NewLogger("validate").Infof("Validating config: %+v", cfg)
 
 	// camera is required
@@ -250,7 +256,6 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 	<-s.cancelCtx.Done()
 
 	s.logger.Infof("Starting background control loop.")
-
 	s.cancelCtx, s.cancelFunc = context.WithCancel(context.Background())
 
 	imageWidth, _, err := getImageSize(s.cancelCtx, s.camera, s.logger)
@@ -259,6 +264,10 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 		return err
 	}
 	s.logger.Infof("Image width: %d", imageWidth)
+
+	for i := range s.heads {
+		go s.heads[i].controlServos(s.cancelCtx, s.cfg.MaxServoRatePerSecond, s.logger)
+	}
 
 	for {
 		select {
@@ -275,37 +284,31 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 
 		s.logger.Infof("Lowest person detection center: %d", lowestPersonDetectionCenter)
 
-		var wg sync.WaitGroup
-		for _, head := range s.heads {
-			wg.Add(1)
-			go func(h Head) {
-				defer wg.Done()
-				err := h.process(s.cancelCtx, lowestPersonDetectionCenter, imageWidth, s.cfg.FieldOfView, s.logger)
-				if err != nil {
-					s.logger.Error(err)
-				}
-			}(head)
+		for i := range s.heads {
+			err := s.heads[i].process(s.cancelCtx, lowestPersonDetectionCenter, imageWidth, s.cfg.FieldOfView, s.logger)
+			if err != nil {
+				s.logger.Error(err)
+			}
 		}
-		wg.Wait()
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
 func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, imageWidth int, fieldOfView float64, logger logging.Logger) error {
 	// no person detected, move to default position
 	if lowestPersonDetectionCenter < 0 {
-		err := head.moveServoToAngle(context.Background(), 90, logger)
+		err := head.moveServoToAngle(ctx, 90, logger)
 		if err != nil {
 			return err
 		}
 		if head.lightPin != nil {
-			head.lightPin.Set(context.Background(), false, nil)
+			head.lightPin.Set(ctx, false, nil)
 		}
 
 	} else {
 		percentOfImageWidth := float64(lowestPersonDetectionCenter) / float64(imageWidth)
 
-		currentAngle, err := head.servoEyeL.Position(context.Background(), nil)
+		currentAngle, err := head.servoEyeL.Position(ctx, nil)
 		if err != nil {
 			return err
 		}
@@ -314,7 +317,7 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 		logger.Debugf("%s: Percent of image width: %.1f, Target angle: %.1f degrees", head.name, percentOfImageWidth, targetAngle)
 
 		if head.lightPin != nil {
-			head.lightPin.Set(context.Background(), true, nil)
+			head.lightPin.Set(ctx, true, nil)
 		}
 
 		// intentionally overshoot a bit since there's inherent lag. 90 is special since it's the rest position.
@@ -322,13 +325,62 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 			targetAngle += (targetAngle - float64(currentAngle)) / 2.0
 		}
 
+		head.mu.Lock()
+		head.targetAngle = targetAngle
+		head.mu.Unlock()
+
 		// check if the angle is valid
-		err = head.moveServoToAngle(context.Background(), targetAngle, logger)
+		err = head.moveServoToAngle(ctx, targetAngle, logger)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64, logger logging.Logger) {
+	maxDegreesPerIteration := maxDegreesPerSecond / 50
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debugf("Shutting down control loop for head %s", head.name)
+			return
+		case <-ticker.C:
+			head.mu.Lock()
+			targetAngle := head.targetAngle
+			head.mu.Unlock()
+
+			currentAngle, err := head.servoEyeL.Position(ctx, nil)
+			if err != nil {
+				logger.Errorf("%s: Error getting current servo position: %v", head.name, err)
+				continue
+			}
+
+			// Calculate the difference between target and current angle
+			angleDiff := targetAngle - float64(currentAngle)
+
+			// Limit movement to at most 10 degrees per iteration
+			var moveAngle float64
+			if angleDiff > maxDegreesPerIteration {
+				moveAngle = float64(currentAngle) + float64(maxDegreesPerIteration)
+			} else if angleDiff < float64(maxDegreesPerIteration) {
+				moveAngle = float64(currentAngle) - float64(maxDegreesPerIteration)
+			} else {
+				moveAngle = targetAngle
+			}
+
+			// Only move if there's a significant difference
+			if math.Abs(angleDiff) > 1 {
+				err = head.moveServoToAngle(ctx, moveAngle, logger)
+				if err != nil {
+					logger.Errorf("%s: Error moving servos in control loop: %v", head.name, err)
+				}
+			}
+		}
+	}
 }
 
 func (head *Head) moveServoToAngle(ctx context.Context, angle float64, logger logging.Logger) error {

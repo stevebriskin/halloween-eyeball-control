@@ -13,12 +13,13 @@ Main control logic to track users.
 
 The following attributes are available for this model:
 
-| Name                  | Type         | Inclusion | Description                                                    |
-|-----------------------|--------------|-----------|----------------------------------------------------------------|
-| `field_of_view`       | float        | Required  | Field of view angle of the camera          |
-| `camera_name`         | string       | Required  | Name of the camera component to use for vision detection      |
-| `vision_service_name` | string       | Required  | Name of the vision service to use for person detection        |
-| `heads`               | []HeadConfig | Required  | Array of head configurations for multiple eye assemblies      |
+| Name                      | Type         | Inclusion | Description                                                    |
+|---------------------------|--------------|-----------|----------------------------------------------------------------|
+| `field_of_view`           | float        | Required  | Field of view angle of the camera in degrees    |
+| `max_servo_rate_per_second` | float      | Required  | Maximum servo movement rate in degrees per second  |
+| `camera_name`             | string       | Required  | Name of the camera component to use for vision detection      |
+| `vision_service_name`     | string       | Required  | Name of the vision service to use for person detection        |
+| `heads`                   | []HeadConfig | Required  | Array of head configurations for multiple eye assemblies      |
 
 #### Head Configuration
 
