@@ -297,14 +297,13 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, imageWidth int, fieldOfView float64, logger logging.Logger) error {
 	// no person detected, move to default position
 	if lowestPersonDetectionCenter < 0 {
-		err := head.moveServoToAngle(ctx, 90, logger)
-		if err != nil {
-			return err
-		}
+		head.mu.Lock()
+		head.targetAngle = 90
+		head.mu.Unlock()
+
 		if head.lightPin != nil {
 			head.lightPin.Set(ctx, false, nil)
 		}
-
 	} else {
 		percentOfImageWidth := float64(lowestPersonDetectionCenter) / float64(imageWidth)
 
@@ -328,12 +327,6 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 		head.mu.Lock()
 		head.targetAngle = targetAngle
 		head.mu.Unlock()
-
-		// check if the angle is valid
-		err = head.moveServoToAngle(ctx, targetAngle, logger)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -374,7 +367,7 @@ func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64
 
 			// Only move if there's a significant difference
 			if math.Abs(angleDiff) > 1 {
-				err = head.moveServoToAngle(context.Background(), moveAngle, logger)
+				err = head.moveServosToAngle(ctx, moveAngle, logger)
 				if err != nil {
 					logger.Errorf("%s: Error moving servos in control loop: %v", head.name, err)
 				}
@@ -383,7 +376,7 @@ func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64
 	}
 }
 
-func (head *Head) moveServoToAngle(ctx context.Context, angle float64, logger logging.Logger) error {
+func (head *Head) moveServosToAngle(ctx context.Context, angle float64, logger logging.Logger) error {
 	logger.Debugf("%s: Moving servos to angle: %f", head.name, angle)
 	_, err := utils.RunInParallel(ctx, []utils.SimpleFunc{
 		func(ctx context.Context) error {
