@@ -182,6 +182,7 @@ func newHead(headConfig HeadConfig, deps resource.Dependencies, logger logging.L
 		servoEyeL:              servoEyeL,
 		servoEyeR:              servoEyeR,
 		invertServoDirection:   headConfig.InvertServoDirection,
+		targetAngle:            90,
 	}, nil
 }
 
