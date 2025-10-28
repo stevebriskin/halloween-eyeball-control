@@ -331,8 +331,8 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 }
 
 func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64, logger logging.Logger) {
-	maxDegreesPerIteration := maxDegreesPerSecond / 50
-	ticker := time.NewTicker(20 * time.Millisecond)
+	maxDegreesPerIteration := maxDegreesPerSecond / 5
+	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
