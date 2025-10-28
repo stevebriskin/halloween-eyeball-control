@@ -277,7 +277,7 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 		default:
 		}
 
-		lowestPersonDetectionCenter, err := getLowestPersonDetections(s.cancelCtx, s.visionService, s.logger)
+		lowestPersonDetectionCenter, err := getLowestPersonDetections(s.cancelCtx, s.visionService, s.cfg.CameraName, s.logger)
 		if err != nil {
 			s.logger.Error(err)
 			continue
@@ -427,9 +427,9 @@ func (head *Head) computeTargetAngle(percentOfImageWidth float64, fieldOfView fl
 	return targetAngle
 }
 
-func getLowestPersonDetections(ctx context.Context, vision1Service vision.Service, logger logging.Logger) (int, error) {
+func getLowestPersonDetections(ctx context.Context, vision1Service vision.Service, cameraName string, logger logging.Logger) (int, error) {
 	// Get detections from vision service
-	detections, err := vision1Service.DetectionsFromCamera(ctx, "camera-1", nil)
+	detections, err := vision1Service.DetectionsFromCamera(ctx, cameraName, nil)
 	if err != nil {
 		logger.Error(err)
 		return -1, err
