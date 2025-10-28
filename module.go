@@ -331,8 +331,8 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 }
 
 func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64, logger logging.Logger) {
-	maxDegreesPerIteration := maxDegreesPerSecond / 5
-	ticker := time.NewTicker(200 * time.Millisecond)
+	maxDegreesPerIteration := maxDegreesPerSecond / 10
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -363,10 +363,9 @@ func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64
 				moveAngle = targetAngle
 			}
 
-			logger.Debugf("%s: targetAngle: %.1f, currentAngle: %.1f, angleDiff: %.1f, moveAngle: %.1f", 
+			logger.Debugf("%s: targetAngle: %.1f, currentAngle: %.1f, angleDiff: %.1f, moveAngle: %.1f",
 				head.name, targetAngle, float64(currentAngle), angleDiff, moveAngle)
 
-			
 			err = head.moveServosToAngle(ctx, moveAngle, logger)
 			if err != nil {
 				logger.Errorf("%s: Error moving servos in control loop: %v", head.name, err)
