@@ -357,7 +357,7 @@ func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64
 			var moveAngle float64
 			if angleDiff > 0 && angleDiff > maxDegreesPerIteration {
 				moveAngle = float64(currentAngle) + float64(maxDegreesPerIteration)
-			} else if angleDiff < 0 && angleDiff < maxDegreesPerIteration {
+			} else if angleDiff < 0 && angleDiff < -maxDegreesPerIteration {
 				moveAngle = float64(currentAngle) - float64(maxDegreesPerIteration)
 			} else {
 				moveAngle = targetAngle
