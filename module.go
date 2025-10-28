@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"math"
-
 	"go.viam.com/rdk/components/board"
 	"go.viam.com/rdk/components/camera"
 	generic "go.viam.com/rdk/components/generic"
@@ -356,22 +354,18 @@ func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64
 			// Calculate the difference between target and current angle
 			angleDiff := targetAngle - float64(currentAngle)
 
-			// Limit movement to at most 10 degrees per iteration
 			var moveAngle float64
-			if angleDiff > maxDegreesPerIteration {
+			if angleDiff > 0 && angleDiff > maxDegreesPerIteration {
 				moveAngle = float64(currentAngle) + float64(maxDegreesPerIteration)
-			} else if angleDiff < float64(maxDegreesPerIteration) {
+			} else if angleDiff < 0 && angleDiff < maxDegreesPerIteration {
 				moveAngle = float64(currentAngle) - float64(maxDegreesPerIteration)
 			} else {
 				moveAngle = targetAngle
 			}
 
-			// Only move if there's a significant difference
-			if math.Abs(angleDiff) > 3.0 {
-				err = head.moveServosToAngle(ctx, moveAngle, logger)
-				if err != nil {
-					logger.Errorf("%s: Error moving servos in control loop: %v", head.name, err)
-				}
+			err = head.moveServosToAngle(ctx, moveAngle, logger)
+			if err != nil {
+				logger.Errorf("%s: Error moving servos in control loop: %v", head.name, err)
 			}
 		}
 	}
