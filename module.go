@@ -39,8 +39,9 @@ type Head struct {
 	invertServoDirection   bool
 
 	// mutable fields
-	mu          sync.Mutex
-	targetAngle float64
+	mu             sync.Mutex
+	targetAngle    float64
+	lastPersonSeen time.Time
 }
 
 type HeadConfig struct {
@@ -297,12 +298,17 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 	// no person detected, move to default position
 	if lowestPersonDetectionCenter < 0 {
 		head.mu.Lock()
-		head.targetAngle = 90
+
+		// timeout on reset -- must not have seen a person for over a small period to account for detection instability
+		if time.Since(head.lastPersonSeen) > 2*time.Second {
+			head.targetAngle = 90
+			if head.lightPin != nil {
+				head.lightPin.Set(ctx, false, nil)
+			}
+		}
+
 		head.mu.Unlock()
 
-		if head.lightPin != nil {
-			head.lightPin.Set(ctx, false, nil)
-		}
 	} else {
 		percentOfImageWidth := float64(lowestPersonDetectionCenter) / float64(imageWidth)
 
@@ -325,14 +331,17 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 
 		head.mu.Lock()
 		head.targetAngle = targetAngle
+		head.lastPersonSeen = time.Now()
 		head.mu.Unlock()
 	}
 	return nil
 }
 
 func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64, logger logging.Logger) {
-	maxDegreesPerIteration := maxDegreesPerSecond / 10
-	ticker := time.NewTicker(100 * time.Millisecond)
+	const hertz = 10
+
+	maxDegreesPerIteration := maxDegreesPerSecond / hertz
+	ticker := time.NewTicker(time.Second / hertz)
 	defer ticker.Stop()
 
 	for {
@@ -424,6 +433,7 @@ func (head *Head) computeTargetAngle(percentOfImageWidth float64, fieldOfView fl
 	return targetAngle
 }
 
+// return -1 if no person detected, otherwise return the center of the person detection in the X axis
 func getLowestPersonDetections(ctx context.Context, vision1Service vision.Service, cameraName string, logger logging.Logger) (int, error) {
 	// Get detections from vision service
 	detections, err := vision1Service.DetectionsFromCamera(ctx, cameraName, nil)
