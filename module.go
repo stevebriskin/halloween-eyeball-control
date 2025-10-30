@@ -57,6 +57,7 @@ type HeadConfig struct {
 type Config struct {
 	FieldOfView           float64      `json:"field_of_view"`
 	MaxServoRatePerSecond float64      `json:"max_servo_rate_per_second"`
+	ServoControlHz        int          `json:"servo_control_hz"`
 	CameraName            string       `json:"camera_name"`
 	VisionServiceName     string       `json:"vision_service_name"`
 	Heads                 []HeadConfig `json:"heads"`
@@ -265,8 +266,12 @@ func (s *halloweenEyeballControlEyecontrol) Run() error {
 	}
 	s.logger.Infof("Image width: %d", imageWidth)
 
+	servoControlHz := s.cfg.ServoControlHz
+	if servoControlHz == 0 {
+		servoControlHz = 10
+	}
 	for i := range s.heads {
-		go s.heads[i].controlServos(s.cancelCtx, s.cfg.MaxServoRatePerSecond, s.logger)
+		go s.heads[i].controlServos(s.cancelCtx, s.cfg.MaxServoRatePerSecond, servoControlHz, s.logger)
 	}
 
 	for {
@@ -337,11 +342,9 @@ func (head *Head) process(ctx context.Context, lowestPersonDetectionCenter int, 
 	return nil
 }
 
-func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64, logger logging.Logger) {
-	const hertz = 10
-
-	maxDegreesPerIteration := maxDegreesPerSecond / hertz
-	ticker := time.NewTicker(time.Second / hertz)
+func (head *Head) controlServos(ctx context.Context, maxDegreesPerSecond float64, servoControlHz int, logger logging.Logger) {
+	maxDegreesPerIteration := maxDegreesPerSecond / float64(servoControlHz)
+	ticker := time.NewTicker(time.Second / time.Duration(servoControlHz))
 	defer ticker.Stop()
 
 	for {
